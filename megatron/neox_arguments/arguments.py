@@ -32,7 +32,6 @@ try:
     from typing import Literal, Union
 except ImportError:
     from typing_extensions import Literal, Union
-from deepspeed.launcher.runner import DLTS_HOSTFILE
 from megatron.logging import Tee
 from megatron.tokenizer import build_tokenizer
 from megatron.utils import obtain_resource_pool, expand_attention_types
@@ -76,15 +75,6 @@ OPT_PARAMS_DEFAULTS = {
     "cuda_aware": False,
 }
 
-
-AUTOTUNING_ARGS = (
-    "train_batch_size",
-    "train_micro_batch_size_per_gpu",
-    "gradient_accumulation_steps",
-    "zero_optimization",
-    "autotuning",
-)
-
 BASE_CLASSES = [
     NeoXArgsDeepspeedRunner,
     NeoXArgsDeepspeedConfig,
@@ -101,9 +91,6 @@ BASE_CLASSES = [
 
 DEEPSPEED_ARG_CLASSES = [NeoXArgsDeepspeedRunner, NeoXArgsDeepspeedConfig]
 NEOX_ARG_CLASSES = [i for i in BASE_CLASSES if i not in DEEPSPEED_ARG_CLASSES]
-
-if "DLTS_HOSTFILE" in os.environ:
-    DLTS_HOSTFILE = os.environ["DLTS_HOSTFILE"]
 
 
 @dataclass
@@ -309,14 +296,6 @@ class NeoXArgs(*BASE_CLASSES):
             default=None,
             help="prefix to append to eval results file",
         )
-        parser.add_argument(
-            "-H",
-            "--hostfile",
-            type=str,
-            help="Hostfile path (in MPI style) that defines the "
-            "resource pool available to the job (e.g., "
-            "worker-0 slots=4)",
-        )
         group = parser.add_argument_group(title="Generation args")
         group.add_argument(
             "-i",
@@ -331,15 +310,6 @@ class NeoXArgs(*BASE_CLASSES):
             type=str,
             default=None,
             help="Optionally overwrite `sample_output_file` for generate.py",
-        )
-
-        tuning = parser.add_argument_group(title="DeepSpeed Autotuning")
-        tuning.add_argument(
-            "--autotuning",
-            type=str,
-            default=None,
-            choices=("tune", "run"),
-            help="Use DeepSpeed's autotuning feature to optimize certain hyperparameters. For more details refer to documentation here: https://www.deepspeed.ai/tutorials/autotuning/",
         )
         args_parsed = parser.parse_args(input_args)
 
@@ -362,9 +332,7 @@ class NeoXArgs(*BASE_CLASSES):
         # determine overwrite values
         overwrite_values = dict()
         for k, v in vars(args_parsed).items():
-            if k == "autotuning" and v is not None:
-                overwrite_values["autotuning_run"] = v
-            elif k not in ["conf_dir", "conf_file"] and v is not None:
+            if k not in ["conf_dir", "conf_file"] and v is not None:
                 overwrite_values[k] = v
 
         # load args
@@ -424,23 +392,9 @@ class NeoXArgs(*BASE_CLASSES):
         megatron_config = json.loads(
             base64.urlsafe_b64decode(args_parsed.megatron_config).decode("utf-8")
         )
-        if args_parsed.deepspeed_config is not None:
-            overwrite_values = cls.set_up_autotuning(
-                args_parsed.deepspeed_config, overwrite_values
-            )
         if overwrite_values is not None:
             megatron_config.update(overwrite_values)
         return cls.from_dict(args_dict=megatron_config)
-
-    @staticmethod
-    def set_up_autotuning(encoded_config, overwrite_values):
-        config = json.loads(base64.urlsafe_b64decode(encoded_config).decode("utf-8"))
-        overwrite_values = overwrite_values if overwrite_values else {}
-        for tuning_param in AUTOTUNING_ARGS:
-            # TODO: This is for autotuning specifically, may cause surprises for someone with a weird setup
-            if tuning_param in config:
-                overwrite_values[tuning_param] = config[tuning_param]
-        return overwrite_values
 
     @staticmethod
     def convert_key_value_to_command_line_arg(k, v):
@@ -480,17 +434,8 @@ class NeoXArgs(*BASE_CLASSES):
 
         args_list = list()
 
-        if self.autotuning_run is not None:
-            args_list.extend(
-                self.convert_key_value_to_command_line_arg(
-                    "autotuning", self.autotuning_run
-                )
-            )
-
         # get deepspeed runner args, and only pass them in to deepspeed launcher if they differ from defaults
         for key, default_value in NeoXArgsDeepspeedRunner().defaults():
-            if key == "autotuning_run":
-                continue
             configured_value = getattr(self, key)
 
             if key == "force_multi":
@@ -513,36 +458,12 @@ class NeoXArgs(*BASE_CLASSES):
                     self.convert_key_value_to_command_line_arg("account", account)
                 )
 
-            # master_address = os.environ['SLURM_JOB_NODELIST'].split('\n')[0]
-            # args_list.extend(
-            #    self.convert_key_value_to_command_line_arg('master_addr', master_address)
-            # )
-
-        if "DLTS_HOSTFILE" in os.environ:
-            args_list.extend(
-                self.convert_key_value_to_command_line_arg(
-                    "hostfile", os.environ["DLTS_HOSTFILE"]
-                )
-            )
-
         if "MASTER_ADDR" in os.environ:
             args_list.extend(
                 self.convert_key_value_to_command_line_arg(
                     "master_addr", os.environ["MASTER_ADDR"]
                 )
             )
-
-        if (
-            "--include" in args_list or "--exclude" in args_list
-        ) and "--num_gpus" in args_list:
-            print(
-                "WARNING: both --include/--exclude and num_gpus were specified simultaneously - overriding num_gpus with --include/--exclude"
-            )
-            # cannot specify these both simultaneously, remove num_gpus from list
-            idx = args_list.index("--num_gpus")
-            # pop twice, once for the arg, once for its value
-            args_list.pop(idx)
-            args_list.pop(idx)
 
         # add user script
         args_list.append(self.user_script)
@@ -553,17 +474,10 @@ class NeoXArgs(*BASE_CLASSES):
         # get deepspeed_config
         args_list.append("--deepspeed_config")
 
-        if self.autotuning_run is not None:
-            ds_fp = cwd / Path("ds_config.json")
-            if self.rank == 0:
-                with open(ds_fp, mode="w") as ds_file:
-                    json.dump(self.deepspeed_config, ds_file)
-            args_list.append(str(ds_fp))
-        else:
-            encoded_ds_config = base64.urlsafe_b64encode(
-                json.dumps(self.deepspeed_config).encode("utf-8")
-            ).decode("utf-8")
-            args_list.append(encoded_ds_config)
+        encoded_ds_config = base64.urlsafe_b64encode(
+            json.dumps(self.deepspeed_config).encode("utf-8")
+        ).decode("utf-8")
+        args_list.append(encoded_ds_config)
 
         # get all config values
         args_list.append("--megatron_config")
@@ -828,24 +742,9 @@ class NeoXArgs(*BASE_CLASSES):
         """
 
         # number of gpus
-        # Get number of GPUs param or hostfile to determine train_batch_size
         global_num_gpus = getattr(self, "global_num_gpus", None)
         if global_num_gpus is None:
-            if self.hostfile is not None or os.path.exists(DLTS_HOSTFILE):
-                hostfile_path = self.hostfile or DLTS_HOSTFILE
-                resources = obtain_resource_pool(
-                    hostfile_path, self.include or "", self.exclude or ""
-                )
-                if self.num_nodes is not None and self.num_nodes > 0:
-                    resources = {
-                        k: resources[k]
-                        for k in list(resources.keys())[: self.num_nodes]
-                    }
-                global_num_gpus = sum(map(len, resources.values()))
-                if self.num_gpus is not None and self.num_gpus > 0:
-                    global_num_gpus = self.num_gpus * len(resources)
-            else:
-                global_num_gpus = torch.cuda.device_count()
+            global_num_gpus = torch.cuda.device_count()
             self.update_value("global_num_gpus", global_num_gpus)
 
         logging.info(
@@ -994,10 +893,6 @@ class NeoXArgs(*BASE_CLASSES):
                         ),
                     }
                 )
-            else:
-                assert (
-                    self.autotuning is not None
-                ), f"Zero Stage must be an integer unless you are doing autotuning, not {stage}"
         except KeyError as ke:
             print(f"Zero Optimization config: {self.zero_optimization}")
             raise ke
@@ -1303,9 +1198,6 @@ class NeoXArgs(*BASE_CLASSES):
             actual_value = getattr(self, field_name)
             if actual_value is None:
                 continue  # we allow for some values not to be configured
-
-            if self.autotuning is not None and actual_value == "auto":
-                continue
 
             actual_type = type(actual_value)
             if actual_type != field_def.type:

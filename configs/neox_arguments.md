@@ -2054,17 +2054,6 @@ Args for deepspeed config
     During gradient averaging, perform communication with selected data type. By default it will be determined by selected regime
 
 
-
-- **autotuning**: dict
-
-    Default = None
-
-    Configuration for using autotuning.
-
-    Dictionary as described in Deepspeed documentation: https://www.deepspeed.ai/docs/config-json/#autotuning
-
-
-
 - **activation_checkpointing**: dict
 
     Default = None
@@ -2121,16 +2110,6 @@ Args for deepspeed config
 
 
 
-- **elasticity**: dict
-
-    Default = None
-
-    Configuration for using elastic training.
-
-    Dictionary as described in Deepspeed documentation: https://www.deepspeed.ai/docs/config-json/#elastic-training-config-v01-and-v02
-
-
-
 - **comms_logger**: dict
 
     Default = None
@@ -2183,38 +2162,6 @@ Args for deepspeed config
 
 Args for deepspeed runner (deepspeed.launcher.runner).
     Every argument included here will be passed as command line argument to deepspeed.launcher.runner
-
-
-
-- **hostfile**: str
-
-    Default = None
-
-    list of hostnames / ssh aliases and the number of GPUs per host
-
-    example file contents:
-    worker-1 slots=4
-    worker-2 slots=4
-    127.0.0 slots=4
-    127.0.1 slots=4
-
-
-
-- **include**: str
-
-    Default = None
-
-    Specify hardware resources to use during execution. String format is `NODE_SPEC[@NODE_SPEC ...]` where `NODE_SPEC=NAME[:SLOT[,SLOT ...]]`. If `:SLOT` is omitted, include all slots on that host. Example: `"worker-0@worker-1:0,2"` will use all slots. on `worker-0` and slots `[0, 2]` on `worker-1`.
-
-
-
-- **exclude**: str
-
-    Default = None
-
-    Specify hardware resources to NOT use during execution. Same format as include
-
-
 
 - **num_nodes**: int
 
@@ -2269,15 +2216,6 @@ Args for deepspeed runner (deepspeed.launcher.runner).
     Default = False
 
     If true, autodetects nvlink pairs and remaps cuda visible devices to place them next to each other. This is an Eleuther addition to deepspeed, and should speed up model parallel training on setups with nvlink pairs when mp=2.
-
-
-
-- **autotuning_run**: str
-
-    Default = None
-
-    Either "tune", "run", or `None`.
-
 
 
 - **no_ssh_check**: bool

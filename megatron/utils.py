@@ -193,27 +193,6 @@ def init_wandb(neox_args):
         wandb.config.update(neox_args.all_config)
 
 
-def obtain_resource_pool(
-    hostfile_path, include_arg, exclude_arg
-) -> Dict[str, List[int]]:
-    """
-    Get dict of `resource_pool[hostname] = [list of GPU ranks]` using hostfile, include and exclude args.
-    Modified from: `deepspeed.launcher.runner.main`
-    """
-    resource_pool = fetch_hostfile(hostfile_path)
-    if not resource_pool:
-        resource_pool = {}
-        device_count = torch.cuda.device_count()
-        if device_count == 0:
-            raise RuntimeError("Unable to proceed, no GPU resources available")
-        resource_pool["localhost"] = device_count
-
-    active_resources = parse_inclusion_exclusion(
-        resource_pool, include_arg, exclude_arg
-    )
-    return active_resources
-
-
 def natural_sort(l):
     convert = lambda text: int(text) if text.isdigit() else text.lower()
     alphanum_key = lambda key: [convert(c) for c in re.split("([0-9]+)", key)]

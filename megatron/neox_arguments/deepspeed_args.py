@@ -167,14 +167,6 @@ class NeoXArgsDeepspeedConfig(NeoXArgsTemplate):
     During gradient averaging, perform communication with selected data type. By default it will be determined by selected regime
     """
 
-    # ---Autotuning Options---
-    autotuning: dict = None
-    """
-    Configuration for using autotuning.
-
-    Dictionary as described in Deepspeed documentation: https://www.deepspeed.ai/docs/config-json/#autotuning
-    """
-
     # ---Activation Checkpointing Options---
 
     activation_checkpointing: dict = None
@@ -222,15 +214,6 @@ class NeoXArgsDeepspeedConfig(NeoXArgsTemplate):
     Configuration for using csv_monitor.
     """
 
-    # ---Elastic Training Options---
-
-    elasticity: dict = None
-    """
-    Configuration for using elastic training.
-
-    Dictionary as described in Deepspeed documentation: https://www.deepspeed.ai/docs/config-json/#elastic-training-config-v01-and-v02
-    """
-
     # ---Communication Logging Options---
 
     comms_logger: dict = None
@@ -274,36 +257,11 @@ class NeoXArgsDeepspeedConfig(NeoXArgsTemplate):
     Dictionary of extra arguments to be included in the yaml config file. This can be used for any argument not included in the above list.
     """
 
-    autotuning: dict = None
-    """Dictionary as described in DeepSpeed autotuning documentation: https://github.com/microsoft/DeepSpeed/tree/master/deepspeed/autotuning"""
-
-
 @dataclass
 class NeoXArgsDeepspeedRunner(NeoXArgsTemplate):
     """
     Args for deepspeed runner (deepspeed.launcher.runner).
     Every argument included here will be passed as command line argument to deepspeed.launcher.runner
-    """
-
-    hostfile: str = None
-    """
-    list of hostnames / ssh aliases and the number of GPUs per host
-
-    example file contents:
-    worker-1 slots=4
-    worker-2 slots=4
-    127.0.0 slots=4
-    127.0.1 slots=4
-    """
-
-    include: str = None
-    """
-    Specify hardware resources to use during execution. String format is `NODE_SPEC[@NODE_SPEC ...]` where `NODE_SPEC=NAME[:SLOT[,SLOT ...]]`. If `:SLOT` is omitted, include all slots on that host. Example: `"worker-0@worker-1:0,2"` will use all slots. on `worker-0` and slots `[0, 2]` on `worker-1`.
-    """
-
-    exclude: str = None
-    """
-    Specify hardware resources to NOT use during execution. Same format as include
     """
 
     num_nodes: int = -1
@@ -339,16 +297,6 @@ class NeoXArgsDeepspeedRunner(NeoXArgsTemplate):
     detect_nvlink_pairs: bool = False
     """
     If true, autodetects nvlink pairs and remaps cuda visible devices to place them next to each other. This is an Eleuther addition to deepspeed, and should speed up model parallel training on setups with nvlink pairs when mp=2.
-    """
-
-    autotuning_run: str = None
-    """
-    Either "tune", "run", or `None`.
-    """
-
-    no_ssh_check: bool = False
-    """
-    If true, overrides the default check where DeepSpeed confirms that the headnode is accessible via ssh.
     """
 
     force_multi: bool = False
