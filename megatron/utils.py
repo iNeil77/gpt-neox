@@ -32,7 +32,6 @@ except ModuleNotFoundError:
 
 import torch
 
-from deepspeed.launcher.runner import fetch_hostfile, parse_inclusion_exclusion
 from deepspeed.runtime.bf16_optimizer import BF16_Optimizer
 
 from megatron import print_rank_0
