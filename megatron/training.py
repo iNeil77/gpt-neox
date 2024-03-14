@@ -55,7 +55,7 @@ from megatron.utils import (
     CharCounter,
 )
 from megatron.model.gpt2_model import cross_entropy
-
+from rtpt import RTPT
 from pickle import dump
 import os
 
@@ -889,6 +889,8 @@ def train(
     valid_data_iterator,
 ):
     """Train the model function."""
+    rtpt = RTPT(name_initials=neox_args.runner_initials, experiment_name=neox_args.wandb_run_name, max_iterations=neox_args.train_iters)
+    rtpt.start()
 
     # Turn on training mode which enables dropout.
     model.train()
@@ -908,6 +910,7 @@ def train(
     # to monitor if we've skipped many iterations in a row and trigger an early exit
     overflow_monitor = OverflowMonitor(optimizer)
     while iteration < neox_args.train_iters:
+        rtpt.step()
         if neox_args.profile and iteration == neox_args.profile_step_start:
             torch.cuda.cudart().cudaProfilerStart()
         loss_dict, skipped_iter = train_step(
