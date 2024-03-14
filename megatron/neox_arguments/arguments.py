@@ -34,7 +34,7 @@ except ImportError:
     from typing_extensions import Literal, Union
 from megatron.logging import Tee
 from megatron.tokenizer import build_tokenizer
-from megatron.utils import obtain_resource_pool, expand_attention_types
+from megatron.utils import expand_attention_types
 from .deepspeed_args import NeoXArgsDeepspeedConfig, NeoXArgsDeepspeedRunner
 from .neox_args import (
     NeoXArgsModel,
